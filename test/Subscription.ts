@@ -18,8 +18,12 @@ describe("Lock", function () {
     const SubscriptionToken = await ethers.getContractFactory("SubscriptionToken");
     const subscriptionToken = await SubscriptionToken.deploy(tokenSupply);
 
+    const Registration = await ethers.getContractFactory("Registration");
+    const registration = await Registration.deploy();
+    await registration.register("")
+
     const SubscriptionService = await ethers.getContractFactory("SubscriptionService");
-    const subscriptionService = await SubscriptionService.deploy(subscriptionToken.address);
+    const subscriptionService = await SubscriptionService.deploy(subscriptionToken.address, registration.address);
 
     const SubscriptionServiceProxy = await ethers.getContractFactory("SubscriptionServiceProxy");
     const subscriptionServiceProxy = await SubscriptionServiceProxy.deploy(subscriptionService.address, owner.address, []);
@@ -28,19 +32,12 @@ describe("Lock", function () {
       subscriptionService,
       subscriptionServiceProxy,
       subscriptionToken,
+      registration,
       owner,
       otherAccount,
       tokenSupply
     };
   }
-
-  describe("Deployment", function () {
-    it("Should set the right subscriptionStartTime", async function () {
-      // const { subscription, subscriptionStartTime } = await loadFixture(deploySubscriptionFixture);
-
-      // expect(await subscription.subscriptionStartTime()).to.equal(subscriptionStartTime);
-    });
-  });
 
   describe("SubscriptionVariants", function () {
     describe("addNewSubscriptionVariant", function () {
@@ -116,7 +113,7 @@ describe("Lock", function () {
         const { subscriptionService } = await loadFixture(deploySubscriptionFixture);
         await subscriptionService.addNewSubscriptionVariant(0, 1e8, true);
         await subscriptionService.subscribe(0);
-        expect(await subscriptionService.isSubscriptionAlive()).to.equals(true);
+        expect(await subscriptionService.hasActiveSubscription()).to.equals(true);
       });
 
       it("Subscribed event should be emitted after successful subscription", async function() {
@@ -163,10 +160,10 @@ describe("Lock", function () {
         const { subscriptionService } = await loadFixture(deploySubscriptionFixture);
         await subscriptionService.addNewSubscriptionVariant(0, 1e8, true);
         await subscriptionService.subscribe(0);
-        expect(await subscriptionService.isSubscriptionAlive()).to.equals(true);
+        expect(await subscriptionService.hasActiveSubscription()).to.equals(true);
 
         await subscriptionService.unsubscribe();
-        expect(await subscriptionService.isSubscriptionAlive()).to.equals(false);
+        expect(await subscriptionService.hasActiveSubscription()).to.equals(false);
       });
 
       it("Should revert if address is not a subscriber", async function () {

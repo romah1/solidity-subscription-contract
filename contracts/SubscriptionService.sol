@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
+import "./Registration.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract SubscriptionService {
@@ -25,19 +27,22 @@ contract SubscriptionService {
   event Unsubscribed(address addr, uint variantId, uint startTime);
 
   address public token;
+  address public registration;
+
   mapping(address => Subscription) public addressSubscription;
   SubscriptionVariant[] public subscriptionVariants;
 
   address private _owner;
 
-  constructor(address token_) {
+  constructor(address token_, address registration_) {
     token = token_;
+    registration = registration_;
     _owner = msg.sender;
   }
 
-  function subscribe(uint subscriptionVariantId_) public payable {
+  function subscribe(uint subscriptionVariantId_) public payable registeredOnly {
     subscriptionVariants.length;
-    require(!isSubscriptionAlive(), "Already have an active subscription");
+    require(!hasActiveSubscription(), "Already have an active subscription");
 
     SubscriptionVariant memory subscriptionVariant = subscriptionVariantById(subscriptionVariantId_);
     bool ok = IERC20(token).transferFrom(msg.sender, address(this), subscriptionVariant.cost);
@@ -48,14 +53,14 @@ contract SubscriptionService {
     emit Subscribed(msg.sender, subscriptionVariantId_, block.timestamp);
   }
 
-  function unsubscribe() public {
+  function unsubscribe() public registeredOnly {
     Subscription memory senderSubscription = addressSubscription[msg.sender];
     require(senderSubscription.startTime != 0, "Not a subscriber");
     delete addressSubscription[msg.sender];
     emit Unsubscribed(msg.sender, senderSubscription.variantId, senderSubscription.startTime); 
   }
 
-  function isSubscriptionAlive() public view returns (bool) {
+  function hasActiveSubscription() public view registeredOnly returns (bool) {
     Subscription memory senderSubscription = addressSubscription[msg.sender];
     if (senderSubscription.startTime == 0) {
       return false;
@@ -108,6 +113,14 @@ contract SubscriptionService {
 
   modifier ownerOnly() {
     require(_owner == msg.sender, "Ownership Assertion: Caller of the function is not the owner.");
+    _;
+  }
+
+  modifier registeredOnly() {
+    require(
+      Registration(registration).isAddressRegistered(msg.sender),
+      "Registration Assertion: Caller of the function is not registered."
+    );
     _;
   }
 }
