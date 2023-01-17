@@ -2,27 +2,29 @@
 pragma solidity ^0.8.9;
 
 contract Registration {
+  event Registered(address addr, string metadataUrl);
+  event MetadataUrlChanged(address addr, string oldMetadataUrl, string newMetadataUrl);
+
   struct User {
-    uint registrationTime;
     string metadataUrl;
+    bool notEmpty;
   }
 
   mapping(address => User) public users;
 
-  constructor() {
-  }
-
   function register(string calldata metadataUrl_) public {
     require(!isAddressRegistered(msg.sender), "Already registered");
-    users[msg.sender] = User(block.timestamp, metadataUrl_);
+    users[msg.sender] = User(metadataUrl_, true);
+    emit Registered(msg.sender, metadataUrl_);
   }
 
   function updateMetadata(string calldata newMetadataUrl_) public {
-    require(!isAddressRegistered(msg.sender), "Not registered yet");
+    require(isAddressRegistered(msg.sender), "Not registered");
+    emit MetadataUrlChanged(msg.sender, users[msg.sender].metadataUrl, newMetadataUrl_);
     users[msg.sender].metadataUrl = newMetadataUrl_;
   }
 
   function isAddressRegistered(address addr_) public view returns (bool) {
-    return users[addr_].registrationTime != 0;
+    return users[addr_].notEmpty;
   }
 }

@@ -39,7 +39,54 @@ describe("Lock", function () {
     };
   }
 
-  describe("SubscriptionVariants", function () {
+  describe("Registration", function (){
+    describe("register", function() {
+      it("Should register new addresses", async function() {
+        const { registration, otherAccount } = await loadFixture(deploySubscriptionFixture);
+        await registration.connect(otherAccount).register("");
+        expect(await registration.isAddressRegistered(otherAccount.address)).to.equals(true);
+      });
+
+      it("Should emit Registered event", async function() {
+        const { registration, otherAccount } = await loadFixture(deploySubscriptionFixture);
+        const meta = "url";
+        await expect(registration.connect(otherAccount).register(meta))
+          .to.emit(registration, "Registered")
+          .withArgs(otherAccount.address, meta);
+      });
+
+      it("Should revert if address is already registered", async function() {
+        const { registration, otherAccount } = await loadFixture(deploySubscriptionFixture);
+        await registration.connect(otherAccount).register("");
+        await expect(registration.connect(otherAccount).register("")).to.be.revertedWith("Already registered");
+      });
+    });
+
+    describe("updateMetadata", function() {
+      it("Should update metadata", async function() {
+        const { registration, otherAccount } = await loadFixture(deploySubscriptionFixture);
+        await registration.connect(otherAccount).register("old");
+        await registration.connect(otherAccount).updateMetadata("new");
+        expect((await registration.users(otherAccount.address)).metadataUrl).to.equals("new");
+      });
+
+      it("Should emit MetadataUrlChanged event", async function() {
+        const { registration, otherAccount } = await loadFixture(deploySubscriptionFixture);
+        await registration.connect(otherAccount).register("old");
+        await expect(registration.connect(otherAccount).updateMetadata("new"))
+          .to.emit(registration, "MetadataUrlChanged")
+          .withArgs(otherAccount.address, "old", "new");
+      });
+
+      it("Should revert if address is not registered", async function() {
+        const { registration, otherAccount } = await loadFixture(deploySubscriptionFixture);
+        await expect(registration.connect(otherAccount).updateMetadata("new"))
+          .to.be.revertedWith("Not registered");
+      });
+    });
+  });
+
+  describe("SubscriptionService", function () {
     describe("addNewSubscriptionVariant", function () {
       it("Should add new subscription variant accessible by its id", async function () {
         const { subscriptionService } = await loadFixture(deploySubscriptionFixture);
