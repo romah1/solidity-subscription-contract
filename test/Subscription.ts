@@ -5,12 +5,7 @@ import { ethers } from "hardhat";
 
 describe("Lock", function () {
   async function deploySubscriptionFixture() {
-    const subscriptionStartTime = Math.round(Date.now() / 1000);
     const tokenSupply = 1e15;
-    const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-    const subscriptionStopTime = subscriptionStartTime + ONE_YEAR_IN_SECS;
-    const period_in_secs = 28 * 24 * 60 * 60;
-    const period_cost = ethers.utils.parseEther("1");
 
     const [owner, otherAccount] = await ethers.getSigners();
 
