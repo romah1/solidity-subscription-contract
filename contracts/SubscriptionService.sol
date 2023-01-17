@@ -2,10 +2,11 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";
 
 contract SubscriptionService {
   struct Subscription {
-    bytes32 variantId;
+    uint variantId;
     uint startTime;
   }
 
@@ -13,20 +14,20 @@ contract SubscriptionService {
     uint cost;
     uint timeToLive;
     bool available;
+    uint id;
   }
 
-  event SubscriptionVariantIssued(bytes32 id);
+  event SubscriptionVariantIssued(uint id);
 
-  event SubscriptionVariantUnavailable(bytes32 id);
+  event SubscriptionVariantUnavailable(uint id);
 
-  event Subscribed(address addr, bytes32 variantId, uint startTime);
+  event Subscribed(address addr, uint variantId, uint startTime);
 
-  event Unsubscribed(address addr, bytes32 variantId, uint startTime);
+  event Unsubscribed(address addr, uint variantId, uint startTime);
 
   address public token;
   mapping(address => Subscription) public addressSubscription;
-  mapping(bytes32 => SubscriptionVariant) public subscriptionVariantById;
-  SubscriptionVariant[] public allSubscriptionVariants;
+  SubscriptionVariant[] public subscriptionVariants;
 
   address private _owner;
 
@@ -35,16 +36,17 @@ contract SubscriptionService {
     _owner = msg.sender;
   }
 
-  function subscribe(bytes32 subscriptionVariantId_) public payable {
+  function subscribe(uint subscriptionVariantId_) public payable {
+    subscriptionVariants.length;
     require(!isSubscriptionAlive(), "Already have an active subscription");
 
-    SubscriptionVariant memory subscriptionVariant = subscriptionVariantById[subscriptionVariantId_];
-    require(subscriptionVariant.available == true, "Subscription variant is unavailable");
-    
-    bool ok = IERC20(token).transfer(address(this), subscriptionVariant.cost);
+    SubscriptionVariant memory subscriptionVariant = subscriptionVariantById(subscriptionVariantId_);
+    bool ok = IERC20(token).transferFrom(msg.sender, address(this), subscriptionVariant.cost);
     require(ok, "Failed to transfer payment token");
 
     addressSubscription[msg.sender] = Subscription(subscriptionVariantId_, block.timestamp);
+
+    emit Subscribed(msg.sender, subscriptionVariantId_, block.timestamp);
   }
 
   function unsubscribe() public {
@@ -59,30 +61,51 @@ contract SubscriptionService {
     if (senderSubscription.startTime == 0) {
       return false;
     }
-    SubscriptionVariant memory subscriptionVariant = subscriptionVariantById[senderSubscription.variantId];
+    SubscriptionVariant memory subscriptionVariant = subscriptionVariantById(senderSubscription.variantId);
     return block.timestamp - senderSubscription.startTime <= subscriptionVariant.timeToLive;
   }
   
-  function addNewSubscriptionVariant(SubscriptionVariant calldata subscriptionVariant_) private ownerOnly {
-    require(subscriptionVariant_.timeToLive != 0, "Subscriptions with zero timeToLive are not allowed");
-    bytes32 newSubscriptionVariantId = subscriptionVariantId(subscriptionVariant_);
-    require(subscriptionVariantById[newSubscriptionVariantId].timeToLive == 0, "Subscription already exists");
-    subscriptionVariantById[newSubscriptionVariantId] = subscriptionVariant_;
-    allSubscriptionVariants.push(subscriptionVariant_);
-    emit SubscriptionVariantIssued(newSubscriptionVariantId);
+  function addNewSubscriptionVariant(uint cost_, uint timeToLive_, bool availability_) public ownerOnly returns (uint) {
+    uint newVariantId = subscriptionVariants.length;
+    SubscriptionVariant memory subscriptionVariant = SubscriptionVariant(
+      cost_,
+      timeToLive_,
+      availability_,
+      newVariantId
+    );
+    subscriptionVariants.push(subscriptionVariant);
+    emit SubscriptionVariantIssued(newVariantId);
+    return newVariantId;
   }
 
-  function makeSubscriptionVariantUnavailable(bytes32 subscriptionVariantId_) private ownerOnly {
-    SubscriptionVariant storage subscriptionVariant = subscriptionVariantById[subscriptionVariantId_];
-    require(subscriptionVariant.timeToLive != 0, "Subscription does not exist");
-    require(subscriptionVariant.available == true, "Subscription is already unavailable");
-    subscriptionVariant.available = false;
+  function makeSubscriptionVariantUnavailable(uint subscriptionVariantId_) public ownerOnly {
+    changeSubscriptionVariantAvailility(subscriptionVariantId_, false);
+  }
+
+  function makeSubscriptionVariantAvailable(uint subscriptionVariantId_) public ownerOnly {
+    changeSubscriptionVariantAvailility(subscriptionVariantId_, true);
+  }
+
+  function changeSubscriptionVariantAvailility(uint subscriptionVariantId_, bool newValue_) private ownerOnly {
+    ensureSubscriptionVariantExists(subscriptionVariantId_);
+    SubscriptionVariant storage subscriptionVariant = subscriptionVariants[subscriptionVariantId_];
+    require(subscriptionVariant.available == !newValue_, "Subscription variant availability already equals newValue");
+    subscriptionVariant.available = newValue_;
     emit SubscriptionVariantUnavailable(subscriptionVariantId_);
   }
 
-  function subscriptionVariantId(SubscriptionVariant calldata subscriptionVariant_) public pure returns (bytes32) {
-    return keccak256(abi.encode(subscriptionVariant_));
-  } 
+  function subscriptionVariantById(uint id) public view returns (SubscriptionVariant memory) {
+    ensureSubscriptionVariantExists(id);
+    return subscriptionVariants[id];
+  }
+
+  function ensureSubscriptionVariantExists(uint id) public view {
+    require(hasSubscriptionVariantWithId(id), "Subsciption variant does not exists");
+  }
+
+  function hasSubscriptionVariantWithId(uint id) public view returns (bool) {
+    return id < subscriptionVariants.length;
+  }
 
   modifier ownerOnly() {
     require(_owner == msg.sender, "Ownership Assertion: Caller of the function is not the owner.");
