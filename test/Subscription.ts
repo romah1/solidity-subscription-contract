@@ -3,7 +3,7 @@ const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-describe("Lock", function () {
+describe("SubscriptionService", function () {
   async function deploySubscriptionFixture() {
     const tokenSupply = 1e15;
 

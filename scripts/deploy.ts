@@ -1,31 +1,33 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-  const subscriptionStopTime = currentTimestampInSeconds + ONE_YEAR_IN_SECS;
+  const TokenSupply = 1e8
+  const [owner] = await ethers.getSigners();
 
-  const Subscription = await ethers.getContractFactory("Subscription");
+  const SubscriptionToken = await ethers.getContractFactory("SubscriptionToken");
+  const subscriptionToken = await SubscriptionToken.deploy(TokenSupply);
 
-  const period_in_secs = 28 * 24 * 60 * 60;
-  const period_cost = ethers.utils.parseEther("1");
+  const Registration = await ethers.getContractFactory("Registration");
+  const registration = await Registration.deploy();
 
-  const subscription = await Subscription.deploy(
-    currentTimestampInSeconds,
-    subscriptionStopTime,
-    period_in_secs,
-    period_cost
-  )
-  await subscription.deployed()
+  const SubscriptionService = await ethers.getContractFactory("SubscriptionService");
+  const subscriptionService = await SubscriptionService.deploy(subscriptionToken.address, registration.address);
+
+  const SubscriptionServiceProxy = await ethers.getContractFactory("SubscriptionServiceProxy");
+  const subscriptionServiceProxy = await SubscriptionServiceProxy.deploy(subscriptionService.address, owner.address, []);
+
+  const RegistrationProxy = await ethers.getContractFactory("RegistrationProxy");
+  const registrationProxy = await RegistrationProxy.deploy(registration.address, owner.address, []);
 
   console.log(
-    `Subscription with
-    ${currentTimestampInSeconds} start time,
-    ${subscriptionStopTime} stop time,
-    ${period_in_secs} period in secs,
-    ${period_cost} period cost
-    deployed to ${subscription.address}`
-  );
+    `Owner address is ${owner.address}
+Token supply is ${TokenSupply}
+SubscriptionToken deployed to ${subscriptionToken.address}
+Registration deployed to ${registration.address}
+SubscriptionService deployed to ${subscriptionService.address}
+SubscriptionServiceProxy deployed to ${subscriptionServiceProxy.address}
+RegistrationProxy deployed to ${registrationProxy.address}`
+  )
 }
 
 main().catch((error) => {
